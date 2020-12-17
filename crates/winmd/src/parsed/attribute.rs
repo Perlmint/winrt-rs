@@ -3,17 +3,16 @@ use crate::TypeReader;
 
 #[derive(Copy, Clone)]
 pub struct Attribute {
-    pub reader: &'static TypeReader,
     pub row: Row,
 }
 
 impl Attribute {
     pub fn parent(&self) -> HasAttribute {
-        self.reader.decode(self.row, 0)
+        TypeReader::get().decode(self.row, 0)
     }
 
     pub fn constructor(&self) -> AttributeType {
-        self.reader.decode(self.row, 1)
+        TypeReader::get().decode(self.row, 1)
     }
 
     pub fn name(&self) -> (&'static str, &'static str) {
@@ -31,12 +30,12 @@ impl Attribute {
     pub fn args(&self) -> Vec<(String, AttributeArg)> {
         let (mut sig, mut values) = match self.constructor() {
             AttributeType::MethodDef(method) => (
-                self.reader.blob(method.row, 4),
-                self.reader.blob(self.row, 2),
+                TypeReader::get().blob(method.row, 4),
+                TypeReader::get().blob(self.row, 2),
             ),
             AttributeType::MemberRef(method) => (
-                self.reader.blob(method.row, 2),
-                self.reader.blob(self.row, 2),
+                TypeReader::get().blob(method.row, 2),
+                TypeReader::get().blob(self.row, 2),
             ),
         };
 
@@ -71,13 +70,13 @@ impl Attribute {
                         let name = values.read_str();
                         let index = name.rfind('.').unwrap();
                         AttributeArg::TypeDef(
-                            self.reader
-                                .resolve_type_def((&name[0..index], &name[index + 1..])),
+                            TypeReader::get()
+                                .expect_type_def((&name[0..index], &name[index + 1..])),
                         )
                     } else {
                         let def = match type_def_or_ref {
                             TypeDefOrRef::TypeRef(value) => {
-                                self.reader.resolve_type_def(value.name())
+                                TypeReader::get().expect_type_def(value.name())
                             }
                             TypeDefOrRef::TypeDef(value) => value,
                             TypeDefOrRef::TypeSpec(_) => panic!("Unsupported underlying type"),
@@ -112,8 +111,8 @@ impl Attribute {
                     let name = values.read_str();
                     let index = name.rfind('.').unwrap();
                     AttributeArg::TypeDef(
-                        self.reader
-                            .resolve_type_def((&name[0..index], &name[index + 1..])),
+                        TypeReader::get()
+                            .expect_type_def((&name[0..index], &name[index + 1..])),
                     )
                 }
                 _ => panic!("Unexpected named attribute argument type"),

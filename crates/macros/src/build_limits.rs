@@ -10,9 +10,7 @@ impl BuildLimits {
     pub fn to_tokens_string(self) -> Result<String, proc_macro2::TokenStream> {
         let is_foundation = self.0.is_empty();
 
-        let reader = winmd::TypeReader::from_build();
-
-        let mut limits = TypeLimits::new(reader);
+        let mut limits = TypeLimits::new();
 
         let foundation_namespaces = &[
             "Windows.Foundation",
@@ -41,7 +39,7 @@ impl BuildLimits {
             })?;
         }
 
-        let mut tree = TypeTree::from_limits(reader, &limits);
+        let mut tree: TypeTree::from(limits);
 
         if !is_foundation {
             for namespace in foundation_namespaces {

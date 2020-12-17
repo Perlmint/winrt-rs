@@ -35,5 +35,5 @@ pub(crate) trait View {
 }
 
 pub trait Decode {
-    fn decode(reader: &'static TypeReader, code: u32, file: u16) -> Self;
+    fn decode( code: u32, file: u16) -> Self;
 }

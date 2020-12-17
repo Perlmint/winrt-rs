@@ -3,43 +3,41 @@ use crate::{TableIndex, TypeReader};
 
 #[derive(Copy, Clone)]
 pub struct TypeDef {
-    pub reader: &'static TypeReader,
     pub row: Row,
 }
 
 impl TypeDef {
     pub fn flags(&self) -> TypeFlags {
-        TypeFlags(self.reader.u32(self.row, 0))
+        TypeFlags(TypeReader::get().u32(self.row, 0))
     }
 
     pub fn name(&self) -> (&'static str, &'static str) {
-        (self.reader.str(self.row, 2), self.reader.str(self.row, 1))
+        let reader = TypeReader::get();
+        (reader.str(self.row, 2), reader.str(self.row, 1))
     }
 
     pub fn extends(&self) -> TypeDefOrRef {
-        self.reader.decode(self.row, 3)
+        TypeReader::get().decode(self.row, 3)
     }
 
     pub fn fields(&self) -> impl Iterator<Item = Field> + '_ {
-        self.reader
+        TypeReader::get()
             .list(self.row, TableIndex::Field, 4)
             .map(move |row| Field {
-                reader: self.reader,
                 row,
             })
     }
 
     pub fn methods(&self) -> impl Iterator<Item = MethodDef> + '_ {
-        self.reader
+        TypeReader::get()
             .list(self.row, TableIndex::MethodDef, 5)
             .map(move |row| MethodDef {
-                reader: self.reader,
                 row,
             })
     }
 
     pub fn generics(&self) -> impl Iterator<Item = GenericParam> + '_ {
-        self.reader
+        TypeReader::get()
             .equal_range(
                 self.row.file_index,
                 TableIndex::GenericParam,
@@ -47,13 +45,12 @@ impl TypeDef {
                 TypeOrMethodDef::TypeDef(*self).encode(),
             )
             .map(move |row| GenericParam {
-                reader: self.reader,
                 row,
             })
     }
 
     pub fn interfaces(&self) -> impl Iterator<Item = InterfaceImpl> + '_ {
-        self.reader
+        TypeReader::get()
             .equal_range(
                 self.row.file_index,
                 TableIndex::InterfaceImpl,
@@ -61,13 +58,12 @@ impl TypeDef {
                 self.row.index + 1,
             )
             .map(move |row| InterfaceImpl {
-                reader: self.reader,
                 row,
             })
     }
 
     pub fn attributes(&self) -> impl Iterator<Item = Attribute> + '_ {
-        self.reader
+        TypeReader::get()
             .equal_range(
                 self.row.file_index,
                 TableIndex::CustomAttribute,
@@ -75,7 +71,6 @@ impl TypeDef {
                 HasAttribute::TypeDef(*self).encode(),
             )
             .map(move |row| Attribute {
-                reader: self.reader,
                 row,
             })
     }
@@ -130,6 +125,7 @@ impl TypeDef {
 
 impl std::fmt::Debug for TypeDef {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // TODO: add name to debug output
         f.debug_struct("TypeDef").field("row", &self.row).finish()
     }
 }

@@ -3,7 +3,6 @@ use crate::*;
 use std::convert::TryInto;
 
 pub struct Blob {
-    pub reader: &'static TypeReader,
     pub file_index: u16,
     pub offset: usize,
 }
@@ -57,7 +56,6 @@ impl Blob {
             } else {
                 self.offset += offset;
                 mods.push(TypeDefOrRef::decode(
-                    self.reader,
                     self.read_unsigned(),
                     self.file_index,
                 ))
@@ -122,6 +120,6 @@ impl Blob {
     }
 
     fn file(&self) -> &File {
-        &self.reader.files[self.file_index as usize]
+        &TypeReader::get().files[self.file_index as usize]
     }
 }

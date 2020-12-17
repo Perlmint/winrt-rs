@@ -5,8 +5,8 @@ mod traits;
 mod type_reader;
 mod workspace;
 
-pub use file::{File, TableIndex};
+pub use file::*;
 pub use parsed::*;
 pub use traits::*;
-pub use type_reader::TypeReader;
+pub use type_reader::*;
 pub use workspace::*;

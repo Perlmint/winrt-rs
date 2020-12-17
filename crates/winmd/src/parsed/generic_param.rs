@@ -3,13 +3,12 @@ use crate::TypeReader;
 
 #[derive(Copy, Clone)]
 pub struct GenericParam {
-    pub reader: &'static TypeReader,
     pub row: Row,
 }
 
 impl GenericParam {
     pub fn name<'a>(&self) -> &'a str {
-        self.reader.str(self.row, 3)
+        TypeReader::get().str(self.row, 3)
     }
 }
 

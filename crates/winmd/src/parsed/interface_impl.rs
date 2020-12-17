@@ -3,17 +3,16 @@ use crate::{TableIndex, TypeReader};
 
 #[derive(Copy, Clone)]
 pub struct InterfaceImpl {
-    pub reader: &'static TypeReader,
     pub row: Row,
 }
 
 impl InterfaceImpl {
     pub fn interface(&self) -> TypeDefOrRef {
-        self.reader.decode(self.row, 1)
+        TypeReader::get().decode(self.row, 1)
     }
 
     pub fn attributes(&self) -> impl Iterator<Item = Attribute> + '_ {
-        self.reader
+        TypeReader::get()
             .equal_range(
                 self.row.file_index,
                 TableIndex::CustomAttribute,
@@ -21,7 +20,6 @@ impl InterfaceImpl {
                 HasAttribute::InterfaceImpl(*self).encode(),
             )
             .map(move |row| Attribute {
-                reader: self.reader,
                 row,
             })
     }

@@ -1,16 +1,16 @@
 use std::collections::BTreeSet;
 
 /// The set of relevant namespaces and types
-pub struct TypeLimits<'a> {
-    reader: &'a winmd::TypeReader,
-    pub inner: BTreeSet<NamespaceTypes>,
+pub struct TypeLimits {
+    pub(crate) cache: &'static winmd::TypeCache,
+    pub(crate) namespaces: BTreeSet<NamespaceTypes>,
 }
 
-impl<'a> TypeLimits<'a> {
-    pub fn new(reader: &'a winmd::TypeReader) -> Self {
+impl TypeLimits {
+    pub fn new() -> Self {
         Self {
-            reader,
-            inner: BTreeSet::new(),
+            cache: winmd::TypeCache::from_build(),
+            namespaces: BTreeSet::new(),
         }
     }
 
@@ -18,30 +18,24 @@ impl<'a> TypeLimits<'a> {
     ///
     /// expects the namespace in the form: `parent::namespace::*`s
     pub fn insert(&mut self, mut limit: NamespaceTypes) -> Result<(), String> {
-        let namespace = match self
-            .reader
-            .types
-            .iter()
-            .find(|(name, _)| name.to_lowercase() == limit.namespace.to_lowercase())
-        {
-            Some((n, _)) => n,
-            None => return Err(limit.namespace),
-        };
-
-        limit.namespace = namespace.clone();
-        self.inner.insert(limit);
-        Ok(())
+        if let Some(namespace) = self.cache.find_lowercase_namespace(&limit.namespace.to_lowercase()) {
+            limit.namespace = namespace.to_string();
+            self.namespaces.insert(limit);
+            Ok(())
+        } else {
+            Err(limit.namespace)
+        }
     }
 
-    pub fn limits(&self) -> impl Iterator<Item = &NamespaceTypes> {
-        self.inner.iter()
+    pub fn namespaces(&self) -> impl Iterator<Item = &NamespaceTypes> {
+        self.namespaces.iter()
     }
 }
 
 /// A namespace's relevant types
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct NamespaceTypes {
-    pub namespace: String,
+    pub namespace: String, // &'static str since it should come from static TypeReader
     pub limit: TypeLimit,
 }
 
@@ -51,5 +45,5 @@ pub enum TypeLimit {
     /// All the types in a namespace
     All,
     /// Some types in the namespace
-    Some(Vec<String>),
+    Some(Vec<String>), // &'static str since it should come from static TypeReader
 }

@@ -3,17 +3,16 @@ use crate::TypeReader;
 
 #[derive(Copy, Clone)]
 pub struct MemberRef {
-    pub reader: &'static TypeReader,
     pub row: Row,
 }
 
 impl MemberRef {
     pub fn parent(&self) -> MemberRefParent {
-        self.reader.decode(self.row, 0)
+        TypeReader::get().decode(self.row, 0)
     }
 
     pub fn name(&self) -> &str {
-        self.reader.str(self.row, 1)
+        TypeReader::get().str(self.row, 1)
     }
 }
 

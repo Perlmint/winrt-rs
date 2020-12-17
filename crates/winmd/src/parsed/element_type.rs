@@ -44,12 +44,10 @@ impl ElementType {
             0x19 => ElementType::USize,
             0x0e => ElementType::String,
             0x11 => ElementType::Struct(TypeDefOrRef::decode(
-                blob.reader,
                 blob.read_unsigned(),
                 blob.file_index,
             )),
             0x12 => ElementType::Class(TypeDefOrRef::decode(
-                blob.reader,
                 blob.read_unsigned(),
                 blob.file_index,
             )),

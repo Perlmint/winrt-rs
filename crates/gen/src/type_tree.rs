@@ -1,6 +1,7 @@
 use crate::*;
 use rayon::prelude::*;
 use squote::TokenStream;
+use std::collections::BTreeSet;
 
 /// A namespaced tree of types
 #[derive(Default)]
@@ -10,51 +11,86 @@ pub struct TypeTree {
     pub include_foundation: bool,
 }
 
-impl TypeTree {
-    pub fn from_limits(reader: &'static winmd::TypeReader, limits: &TypeLimits) -> Self {
-        let mut tree = TypeTree::default();
-        let mut set = std::collections::BTreeSet::new();
+impl From<TypeLimits> for TypeTree {
+    fn from(limits: TypeLimits) -> Self {
+        let mut tree = Self::default();
+        let mut set = BTreeSet::new();
 
-        for limit in limits.limits() {
+        for limit in limits.namespaces() {
             match &limit.limit {
                 TypeLimit::All => {
-                    for (_, def) in reader.namespace_types(&limit.namespace) {
-                        match def.category() {
-                            winmd::TypeCategory::Attribute | winmd::TypeCategory::Contract => {}
-                            _ => tree.insert2(reader, &mut set, &def),
-                        };
-                    }
+                    limits.cache.0.get::<str>(&limit.namespace).unwrap().values().for_each(|row|{
+                        tree.insert_if(&mut set, row);
+                    });
                 }
                 TypeLimit::Some(types) => {
-                    let namespace = &reader.types[&limit.namespace];
-                    for name in types {
-                        tree.insert2(
-                            reader,
-                            &mut set,
-                            &winmd::TypeDef {
-                                reader,
-                                row: namespace[name],
-                            },
-                        );
-                    }
+
                 }
             }
         }
 
         tree
     }
+}
 
-    fn insert2(
+impl TypeTree {
+    // pub fn from_limits(reader: &'static winmd::TypeReader, limits: &TypeLimits) -> Self {
+    //     let mut tree = TypeTree::default();
+    //     let mut set = std::collections::BTreeSet::new();
+
+    //     for limit in limits.limits() {
+    //         match &limit.limit {
+    //             TypeLimit::All => {
+    //                 for def in reader.types[&limit.namespace]
+    //                     .values()
+    //                     .map(|row| winmd::TypeDef { reader, row: *row })
+    //                 {
+    //                     match def.category() {
+    //                         winmd::TypeCategory::Attribute | winmd::TypeCategory::Contract => {}
+    //                         _ => tree.insert2(reader, &mut set, &def),
+    //                     };
+    //                 }
+    //             }
+    //             TypeLimit::Some(types) => {
+    //                 let namespace = &reader.types[&limit.namespace];
+    //                 // TODO: if 'name' isn't a type but a constant/function then look it up
+    //                 // inside the Apis class for that namespace and add it to a `Class32`?
+
+    //                 //let mut apis = None;
+
+    //                 for name in types {
+    //                     if let Some(row) = namespace.get(name) {
+    //                         tree.insert2(reader, &mut set, &winmd::TypeDef { reader, row: *row });
+    //                     }
+    //                     //  else {
+    //                     //     if apis.is_none() {
+    //                     //         apis = Some(winmd::TypeDef{ reader, row: namespace["Apis"] });
+    //                     //     }
+
+    //                     //     if let Some(apis) = apis {
+
+    //                     //     } else {
+    //                     //         panic!("Type name not found");
+    //                     //     }
+    //                     // }
+    //                 }
+    //             }
+    //         }
+    //     }
+
+    //     tree
+    // }
+
+    fn insert_if(
         &mut self,
-        reader: &winmd::TypeReader,
-        set: &mut std::collections::BTreeSet<winmd::TypeDef>,
-        def: &winmd::TypeDef,
+        set: &mut std::collections::BTreeSet<winmd::CacheRow>,
+        row: &winmd::CacheRow,
     ) {
-        if set.insert(*def) {
-            let t = TypeDefinition::from_type_def(def);
+        if set.insert(*row) {
+            let t = TypeDefinition::from_cache_row(row);
 
             for def in t.dependencies() {
-                self.insert2(reader, set, &def);
+                self.insert_if(set, &winmd::CacheRow::TypeDef(def));
             }
 
             self.insert(t.name().namespace, t);

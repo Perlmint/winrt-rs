@@ -3,21 +3,20 @@ use crate::TypeReader;
 
 #[derive(Copy, Clone)]
 pub struct Param {
-    pub reader: &'static TypeReader,
     pub row: Row,
 }
 
 impl Param {
     pub fn flags(&self) -> ParamFlags {
-        ParamFlags(self.reader.u32(self.row, 0))
+        ParamFlags(TypeReader::get().u32(self.row, 0))
     }
 
     pub fn sequence(&self) -> u32 {
-        self.reader.u32(self.row, 1)
+        TypeReader::get().u32(self.row, 1)
     }
 
     pub fn name(&self) -> &str {
-        self.reader.str(self.row, 2)
+        TypeReader::get().str(self.row, 2)
     }
 }
 

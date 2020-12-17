@@ -3,17 +3,16 @@ use crate::TypeReader;
 
 #[derive(Copy, Clone)]
 pub struct Constant {
-    pub reader: &'static TypeReader,
     pub row: Row,
 }
 
 impl Constant {
     pub fn value_type(&self) -> ElementType {
-        ElementType::from_code(self.reader.u32(self.row, 0))
+        ElementType::from_code(TypeReader::get().u32(self.row, 0))
     }
 
     pub fn value(&self) -> Blob {
-        self.reader.blob(self.row, 2)
+        TypeReader::get().blob(self.row, 2)
     }
 }
 

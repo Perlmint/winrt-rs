@@ -3,13 +3,12 @@ use crate::TypeReader;
 
 #[derive(Copy, Clone)]
 pub struct TypeSpec {
-    pub reader: &'static TypeReader,
     pub row: Row,
 }
 
 impl TypeSpec {
     pub fn sig(&self) -> Blob {
-        self.reader.blob(self.row, 0)
+        TypeReader::get().blob(self.row, 0)
     }
 }
 

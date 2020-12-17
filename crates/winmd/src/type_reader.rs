@@ -3,124 +3,113 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+type TypeMap = BTreeMap<&'static str, BTreeMap<&'static str, TypeRow>>;
+
 /// A reader of type information from Windows Metadata
 pub struct TypeReader {
-    /// The parsed Windows metadata files the [`TypeReader`] has access to
-    pub files: Vec<File>,
-    /// Types known to this [`TypeReader`]
-    ///
-    /// This is a mapping between namespace names and the types inside
-    /// that namespace. The keys are the namespace and the values is a mapping
-    /// of type names to type definitions
-    pub types: BTreeMap<String, BTreeMap<String, Row>>,
-    // TODO: store Row objects and turn them into TypeDef on request.
-    // When turning into TypeDef they add the &'static TypeReader
+    pub(crate) files: Vec<File>,
+    pub(crate) types: TypeMap,
+}
+
+#[derive(Copy, Clone)]
+pub enum TypeRow {
+    TypeDef(TypeDef),
+    MethodDef(MethodDef),
+    Field(Field),
 }
 
 impl TypeReader {
-    pub fn from_build() -> &'static Self {
-        use std::{mem::MaybeUninit, sync::Once};
-        static ONCE: Once = Once::new();
-        static mut VALUE: MaybeUninit<TypeReader> = MaybeUninit::uninit();
+    pub fn get() -> &'static Self {
+        use std::sync::atomic::{AtomicPtr, Ordering};
 
-        ONCE.call_once(|| {
-            // This is safe because `Once` provides thread-safe one-time initialization
-            unsafe { VALUE = MaybeUninit::new(Self::from_iter(winmd_paths())) }
-        });
+        static mut SHARED: AtomicPtr<TypeReader> = 
+            AtomicPtr::new(std::ptr::null_mut());
 
-        // This is safe because `call_once` has already been called.
-        unsafe { &*VALUE.as_ptr() }
-    }
+        let mut ptr = unsafe { SHARED.load(Ordering::Relaxed) };
 
-    /// Insert WinRT metadata at the given paths
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the if the files where the windows metadata are stored cannot be read.
-    fn from_iter<I: IntoIterator<Item = PathBuf>>(files: I) -> Self {
-        let mut reader = Self {
-            files: Vec::default(),
-            types: BTreeMap::default(),
-        };
-        for (file_index, file) in files.into_iter().enumerate() {
-            let file = File::new(file);
-            reader.insert_file_at_index(file, file_index);
-        }
+        if ptr.is_null() {
+            ptr = Box::into_raw(Box::new(Self { files: winmd_files(), types: BTreeMap::new() }));
+            unsafe { *SHARED.get_mut() = ptr };
 
-        reader.remove_excluded_type(("Windows.Foundation", "HResult"));
-        reader.remove_excluded_type(("Windows.Win32", "IUnknown"));
+            let reader: &mut Self = unsafe { &mut *ptr };
+            let mut types = BTreeMap::new();
 
-        // TODO: remove once this is fixed: https://github.com/microsoft/win32metadata/issues/30
-        reader.remove_excluded_type(("Windows.Win32", "CFunctionDiscoveryNotificationWrapper"));
-
-        reader
-    }
-
-    fn remove_excluded_type(&mut self, (namespace, type_name): (&str, &str)) {
-        if let Some(value) = self.types.get_mut(namespace) {
-            value.remove(type_name);
-        }
-    }
-
-    fn insert_file_at_index(&mut self, file: File, file_index: usize) {
-        let row_count = file.type_def_table().row_count;
-        self.files.push(file);
-
-        for row in 0..row_count {
-            let row = Row::new(row, TableIndex::TypeDef, file_index as u16);
-            let (namespace, name) = (self.str(row, 2), self.str(row, 1));
-            let namespace = namespace.to_string();
-            let name = name.to_string();
-
-            self.types
-                .entry(namespace)
-                .or_default()
-                .entry(name)
-                .or_insert(row);
-        }
-    }
-
-    /// Get all the namespace names that the [`TypeReader`] knows about
-    pub fn namespaces(&self) -> impl Iterator<Item = &String> {
-        self.types.keys()
-    }
-
-    /// Get all type definitions ([`TypeDef`]s) for a given namespace
-    ///
-    /// # Panics
-    ///
-    /// Panics if the namespace does not exist
-    pub fn namespace_types(
-        &'static self,
-        namespace: &str,
-    ) -> impl Iterator<Item = (&str, TypeDef)> {
-        self.types[namespace].iter().map(move |(n, row)| {
-            (
-                n.as_str(),
-                TypeDef {
-                    reader: self,
-                    row: *row,
-                },
-            )
-        })
-    }
-
-    /// Resolve a type definition given its namespace and type name
-    ///
-    /// # Panics
-    ///
-    /// Panics if no type definition for the given namespace and type name can be found
-    pub fn resolve_type_def(&'static self, (namespace, type_name): (&str, &str)) -> TypeDef {
-        if let Some(types) = self.types.get(namespace) {
-            if let Some(def) = types.get(type_name) {
-                return TypeDef {
-                    reader: self,
-                    row: *def,
-                };
+            fn insert(types: &mut TypeMap, (namespace, name): (&'static str, &'static str), row: TypeRow) {
+                types
+                    .entry(namespace)
+                    .or_default()
+                    .entry(name)
+                    .or_insert(row);
             }
+
+            fn remove(types: &mut TypeMap, (namespace, name): (&str, &str)) {
+                if let Some(value) = types.get_mut(namespace) {
+                    value.remove(name);
+                }
+            }
+
+            for (file_index, file) in reader.files.iter().enumerate() {
+                let row_count = file.type_def_table().row_count;
+    
+                for row in 0..row_count {
+                    let row = Row::new(row, TableIndex::TypeDef, file_index as u16);
+                    let def = TypeDef { row };
+                    let name = def.name();
+
+                    if name == ("", "<Module>") {
+                        continue;
+                    }
+    
+                    match def.category() {
+                        TypeCategory::Interface
+                        | TypeCategory::Enum
+                        | TypeCategory::Delegate
+                        | TypeCategory::Struct => insert(&mut types, name, TypeRow::TypeDef(def)),
+                        TypeCategory::Class => {
+                            insert(&mut types, name, TypeRow::TypeDef(def));
+                            if !def.is_winrt() {
+                                for field in def.fields() {
+                                    insert(&mut types, name, TypeRow::Field(field));
+                                }
+                                for method in def.methods() {
+                                    insert(&mut types, name, TypeRow::MethodDef(method));
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            remove(&mut types, ("Windows.Foundation", "HResult"));
+            remove(&mut types, ("Windows.Win32", "IUnknown"));
+    
+            // TODO: remove once this is fixed: https://github.com/microsoft/win32metadata/issues/30
+            remove(&mut types, ("Windows.Win32", "CFunctionDiscoveryNotificationWrapper"));
+
+            reader.types = types;
         }
 
-        panic!("Could not find type `{}.{}`", namespace, type_name);
+        unsafe { &*ptr }
+    }
+
+
+
+
+    pub fn find_lowercase_namespace(&self, lowercase: &str) -> Option<&str> {
+        self.types.keys().find(|namespace|namespace.to_lowercase() == lowercase).map(|namespace|*namespace)
+    }
+
+    pub fn find_type(&self, (namespace, name): (&str, &str)) -> Option<TypeRow> { // return Option<&TypeRow> to avoid copy
+        self.types.get(namespace).and_then(|types|types.get(name)).map(|row|*row)
+    }
+
+    pub fn expect_type_def(&self, (namespace, name): (&str, &str)) -> TypeDef {
+        if let Some(TypeRow::TypeDef(def)) = self.find_type((namespace, name)) {
+            return def
+        }
+
+        panic!("Could not find type `{}.{}`", namespace, name);
     }
 
     /// Read a [`u32`] value from a specific [`Row`] and column
@@ -149,7 +138,7 @@ impl TypeReader {
 
     /// Read a `T: Decode` value from a specific [`Row`] and column
     pub(crate) fn decode<T: Decode>(&'static self, row: Row, column: u32) -> T {
-        T::decode(self, self.u32(row, column), row.file_index)
+        T::decode(self.u32(row, column), row.file_index)
     }
 
     pub(crate) fn list(
@@ -185,7 +174,6 @@ impl TypeReader {
             blob_size = blob_size.checked_shl(8).unwrap_or(0) + byte;
         }
         Blob {
-            reader: self,
             file_index: row.file_index,
             offset: offset + blob_size_bytes,
         }
@@ -310,30 +298,30 @@ impl TypeReader {
     }
 }
 
-fn winmd_paths() -> Vec<std::path::PathBuf> {
-    let mut windows_path = workspace_windows_dir();
-    windows_path.push("winmd");
-
-    let mut paths = vec![];
-    push_winmd_paths(windows_path, &mut paths);
-
-    // If at this point the paths vector is still empty then go and grab the winmd files from WinMetadata
-    // to make it easy for developers to get started without having to figure out where to get metadata.
-
-    if paths.is_empty() {
-        if let Ok(dir) = std::env::var("windir") {
-            let mut dir = std::path::PathBuf::from(dir);
-            dir.push(SYSTEM32);
-            dir.push("winmetadata");
-
-            push_winmd_paths(dir, &mut paths);
+fn winmd_files() -> Vec<File> {
+        let mut windows_path = workspace_windows_dir();
+        windows_path.push("winmd");
+    
+        let mut files = vec![];
+        push_winmd_files(windows_path, &mut files);
+    
+        // If at this point the files vector is still empty then go and grab the winmd files from WinMetadata
+        // to make it easy for developers to get started without having to figure out where to get metadata.
+    
+        if files.is_empty() {
+            if let Ok(dir) = std::env::var("windir") {
+                let mut dir = std::path::PathBuf::from(dir);
+                dir.push(SYSTEM32);
+                dir.push("winmetadata");
+    
+                push_winmd_files(dir, &mut files);
+            }
         }
-    }
 
-    paths
+        files
 }
 
-fn push_winmd_paths(dir: std::path::PathBuf, paths: &mut Vec<std::path::PathBuf>) {
+fn push_winmd_files(dir: std::path::PathBuf, paths: &mut Vec<File>) {
     if let Ok(files) = std::fs::read_dir(dir) {
         for file in files.filter_map(|file| file.ok()) {
             if let Ok(file_type) = file.file_type() {
@@ -341,7 +329,7 @@ fn push_winmd_paths(dir: std::path::PathBuf, paths: &mut Vec<std::path::PathBuf>
                     let path = file.path();
                     if let Some("winmd") = path.extension().and_then(|extension| extension.to_str())
                     {
-                        paths.push(file.path());
+                        paths.push(File::new(file.path()));
                     }
                 }
             }
