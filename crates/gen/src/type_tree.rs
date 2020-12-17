@@ -16,11 +16,11 @@ impl From<TypeLimits> for TypeTree {
         let mut tree = Self::default();
         let mut set = BTreeSet::new();
 
-        for limit in limits.namespaces() {
+        for limit in limits.namespaces {
             match &limit.limit {
                 TypeLimit::All => {
-                    limits.cache.0.get::<str>(&limit.namespace).unwrap().values().for_each(|row|{
-                        tree.insert_if(&mut set, row);
+                    limits.reader.namespace_types(&limit.namespace).for_each(|row|{
+                        tree.insert_if(&mut set, &limit.namespace, row);
                     });
                 }
                 TypeLimit::Some(types) => {
@@ -83,17 +83,19 @@ impl TypeTree {
 
     fn insert_if(
         &mut self,
-        set: &mut std::collections::BTreeSet<winmd::CacheRow>,
-        row: &winmd::CacheRow,
+        set: &mut std::collections::BTreeSet<winmd::TypeRow>,
+        namespace: &'static str,
+        row: &winmd::TypeRow,
     ) {
         if set.insert(*row) {
-            let t = TypeDefinition::from_cache_row(row);
+            let t = TypeDefinition::from_type_row(row);
 
             for def in t.dependencies() {
-                self.insert_if(set, &winmd::CacheRow::TypeDef(def));
+                // TODO: calling def.name() repeatedly....
+                self.insert_if(set, def.name().0, &winmd::TypeRow::TypeDef(def));
             }
 
-            self.insert(t.name().namespace, t);
+           self.insert(namespace, t);
         }
     }
 

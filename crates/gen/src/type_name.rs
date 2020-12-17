@@ -83,7 +83,7 @@ impl TypeName {
     ) -> Self {
         blob.read_unsigned();
 
-        let def = winmd::TypeDefOrRef::decode(blob.reader, blob.read_unsigned(), blob.file_index)
+        let def = winmd::TypeDefOrRef::decode( blob.read_unsigned(), blob.file_index)
             .resolve();
 
         let mut args = Vec::with_capacity(blob.read_unsigned() as usize);

@@ -2,14 +2,14 @@ use std::collections::BTreeSet;
 
 /// The set of relevant namespaces and types
 pub struct TypeLimits {
-    pub(crate) cache: &'static winmd::TypeCache,
+    pub(crate) reader: &'static winmd::TypeReader,
     pub(crate) namespaces: BTreeSet<NamespaceTypes>,
 }
 
 impl TypeLimits {
     pub fn new() -> Self {
         Self {
-            cache: winmd::TypeCache::from_build(),
+            reader: winmd::TypeReader::get(),
             namespaces: BTreeSet::new(),
         }
     }
@@ -17,9 +17,9 @@ impl TypeLimits {
     /// Insert a namespace into the set of relevant namespaces
     ///
     /// expects the namespace in the form: `parent::namespace::*`s
-    pub fn insert(&mut self, mut limit: NamespaceTypes) -> Result<(), String> {
-        if let Some(namespace) = self.cache.find_lowercase_namespace(&limit.namespace.to_lowercase()) {
-            limit.namespace = namespace.to_string();
+    pub fn insert(&mut self, mut limit: NamespaceTypes) -> Result<(), &'static str> {
+        if let Some(namespace) = self.reader.find_lowercase_namespace(&limit.namespace.to_lowercase()) {
+            limit.namespace = namespace;
             self.namespaces.insert(limit);
             Ok(())
         } else {
@@ -35,7 +35,7 @@ impl TypeLimits {
 /// A namespace's relevant types
 #[derive(Debug, Ord, PartialOrd, Eq, PartialEq)]
 pub struct NamespaceTypes {
-    pub namespace: String, // &'static str since it should come from static TypeReader
+    pub namespace: &'static str, // &'static str since it should come from static TypeReader
     pub limit: TypeLimit,
 }
 

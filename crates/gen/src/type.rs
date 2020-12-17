@@ -75,7 +75,7 @@ impl Type {
             0x1C => TypeKind::Object,
             0x11 | 0x12 => {
                 let def =
-                    winmd::TypeDefOrRef::decode(blob.reader, blob.read_unsigned(), blob.file_index);
+                    winmd::TypeDefOrRef::decode(blob.read_unsigned(), blob.file_index);
 
                 if def.name().0.is_empty() {
                     // TODO: handle nested types
@@ -257,7 +257,7 @@ impl TypeKind {
             ("Windows.Win32", "IUnknown") => Self::IUnknown,
             ("Windows.Foundation", "HResult") => Self::ErrorCode,
             (namespace, name) => Self::from_type_def(
-                &type_ref.reader.expect_type_def((namespace, name)),
+                &winmd::TypeReader::get().expect_type_def((namespace, name)),
                 calling_namespace,
             ),
         }

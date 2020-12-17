@@ -3,12 +3,12 @@ use squote::{quote, TokenStream};
 
 #[derive(Debug)]
 pub struct Function {
-    pub name: TypeName,
+    pub def: winmd::MethodDef,
 }
 
 impl Function {
-    pub fn from_type_name(name: TypeName) -> Self {
-        Self { name }
+    pub fn from_method_def(def: &winmd::MethodDef) -> Self {
+        Self { def: *def }
     }
 
     pub fn gen(&self) -> TokenStream {

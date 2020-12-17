@@ -32,9 +32,7 @@ impl Class {
                 break;
             }
 
-            base = name
-                .def
-                .reader
+            base = winmd::TypeReader::get()
                 .expect_type_def((base_namespace, base_name));
             let base = TypeName::from_type_def(&base, &name.namespace);
 

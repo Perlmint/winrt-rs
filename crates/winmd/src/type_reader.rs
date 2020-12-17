@@ -7,11 +7,11 @@ type TypeMap = BTreeMap<&'static str, BTreeMap<&'static str, TypeRow>>;
 
 /// A reader of type information from Windows Metadata
 pub struct TypeReader {
-    pub(crate) files: Vec<File>,
-    pub(crate) types: TypeMap,
+    pub files: Vec<File>,
+    pub types: TypeMap,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum TypeRow {
     TypeDef(TypeDef),
     MethodDef(MethodDef),
@@ -93,8 +93,9 @@ impl TypeReader {
         unsafe { &*ptr }
     }
 
-
-
+    pub fn namespace_types(&'static self, namespace: &str) -> impl Iterator<Item = &TypeRow> {
+        self.types.get::<str>(namespace).unwrap().iter().map(|(_, row)| row)
+    }
 
     pub fn find_lowercase_namespace(&self, lowercase: &str) -> Option<&str> {
         self.types.keys().find(|namespace|namespace.to_lowercase() == lowercase).map(|namespace|*namespace)

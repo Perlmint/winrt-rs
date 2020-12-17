@@ -17,6 +17,14 @@ pub enum TypeDefinition {
 }
 
 impl TypeDefinition {
+    pub fn from_type_row(row: &winmd::TypeRow) -> Self {
+        match row {
+            winmd::TypeRow::TypeDef(def) => Self::from_type_def(def),
+            winmd::TypeRow::MethodDef(def) => Self::Function(Function::from_method_def(def)),
+            winmd::TypeRow::Field(def) => Self::Constant(Constant::from_field(def)),
+        }
+    }
+
     pub fn from_type_def(def: &winmd::TypeDef) -> Self {
         let name = TypeName::from_type_def(def, def.name().0);
 
@@ -63,20 +71,20 @@ impl TypeDefinition {
         }
     }
 
-    pub fn name(&self) -> &TypeName {
-        match self {
-            Self::Class(t) => &t.name,
-            Self::Interface(t) => &t.name,
-            Self::Enum(t) => &t.name,
-            Self::Struct(t) => &t.name,
-            Self::Delegate(t) => &t.name,
-            Self::ComClass(t) => &t.name,
-            Self::ComInterface(t) => &t.name,
-            Self::Callback(t) => &t.name,
-            Self::Constant(t) => &t.name,
-            Self::Function(t) => &t.name,
-        }
-    }
+    // pub fn name(&self) -> &TypeName {
+    //     match self {
+    //         Self::Class(t) => &t.name,
+    //         Self::Interface(t) => &t.name,
+    //         Self::Enum(t) => &t.name,
+    //         Self::Struct(t) => &t.name,
+    //         Self::Delegate(t) => &t.name,
+    //         Self::ComClass(t) => &t.name,
+    //         Self::ComInterface(t) => &t.name,
+    //         Self::Callback(t) => &t.name,
+    //         Self::Constant(t) => &t.name,
+    //         Self::Function(t) => &t.name,
+    //     }
+    // }
 
     pub fn dependencies(&self) -> Vec<winmd::TypeDef> {
         match self {
