@@ -1,7 +1,6 @@
 use crate::*;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
 type TypeMap = BTreeMap<&'static str, BTreeMap<&'static str, TypeRow>>;
 

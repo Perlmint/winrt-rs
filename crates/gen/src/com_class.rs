@@ -12,7 +12,7 @@ impl ComClass {
     }
 
     pub fn gen(&self) -> TokenStream {
-        let name = self.name.gen();
+        //let name = self.name.gen();
 
         // TODO: generate constant for CLSID
 

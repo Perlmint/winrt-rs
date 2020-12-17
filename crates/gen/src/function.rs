@@ -1,4 +1,3 @@
-use crate::*;
 use squote::{quote, TokenStream};
 
 #[derive(Debug)]

@@ -1,5 +1,3 @@
-use crate::*;
-
 /// A "Plain Ol' Data" structure that represents any type that
 /// can be viewed from any probably aligned and sized buffer of
 /// bytes in a well defined way. This means that the representation

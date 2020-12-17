@@ -1,5 +1,5 @@
 use super::*;
-use crate::{traits::Decode, TableIndex, TypeReader};
+use crate::{traits::Decode, TableIndex};
 
 use winmd_macros::type_code;
 

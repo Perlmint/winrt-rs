@@ -1,5 +1,4 @@
-use super::*;
-use crate::TypeReader;
+use crate::*;
 
 #[derive(Copy, Clone)]
 pub struct Constant {

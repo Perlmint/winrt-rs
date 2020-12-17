@@ -24,7 +24,9 @@ impl From<TypeLimits> for TypeTree {
                     });
                 }
                 TypeLimit::Some(types) => {
-
+                    for name in types {
+                        tree.insert_if(&mut set, &limit.namespace, &winmd::TypeRow::TypeDef(limits.reader.expect_type_def((&limit.namespace, &name))));
+                    }
                 }
             }
         }
